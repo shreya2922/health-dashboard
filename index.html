@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Health Monitoring Dashboard</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Notification System -->
+    <div id="notification-container" class="notification-container"></div>
+
+    <!-- Login View -->
+    <div id="login-view" class="view active-view">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fa-solid fa-notes-medical login-icon"></i>
+                <h2>HealthMonitor <span class="badge">Pro</span></h2>
+                <p>Welcome back! Please login to your account.</p>
+            </div>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="username" placeholder="Enter username" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" placeholder="Enter password" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <span>Login</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+            <div class="login-footer">
+                <p><i class="fa-solid fa-circle-info"></i> Default: admin / 1234</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard View -->
+    <div id="dashboard-view" class="view hidden-view">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fa-solid fa-heart-pulse"></i>
+                <h1>Patient Monitoring</h1>
+            </div>
+            <div class="nav-actions">
+                <div class="last-updated">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Last Updated: <span id="time-display">Waiting...</span>
+                </div>
+                <button id="logout-btn" class="btn-secondary">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </nav>
+
+        <main class="dashboard-container">
+            <div class="cards-grid">
+                <!-- SpO2 Card -->
+                <div class="stat-card">
+                    <div class="card-header">
+                        <h3>SpO2 (Oxygen)</h3>
+                        <div class="icon-wrapper blue">
+                            <i class="fa-solid fa-lungs"></i>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h2 id="spo2-value">--<span class="unit">%</span></h2>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar fill-blue" id="spo2-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heart Rate Card -->
+                <div class="stat-card">
+                    <div class="card-header">
+                        <h3>Heart Rate</h3>
+                        <div class="icon-wrapper red">
+                            <i class="fa-solid fa-heartbeat"></i>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h2 id="hr-value">--<span class="unit">bpm</span></h2>
+                        <div class="pulse-ring-wrapper">
+                            <div class="pulse-ring" id="hr-pulse"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Card -->
+                <div class="stat-card">
+                    <div class="card-header">
+                        <h3>Patient Status</h3>
+                        <div class="icon-wrapper grey" id="status-icon-wrapper">
+                            <i class="fa-solid fa-shield-heart"></i>
+                        </div>
+                    </div>
+                    <div class="card-body status-body">
+                        <h2 id="status-value">Monitoring...</h2>
+                        <p id="status-message" class="subtitle">Awaiting data</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-chart-line"></i> Real-Time Trends</h3>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="dot dot-blue"></span> SpO2</span>
+                        <span class="legend-item"><span class="dot dot-red"></span> Heart Rate</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="healthChart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Output -->
+    <script src="script.js"></script>
+</body>
+</html>

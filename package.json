@@ -1,0 +1,12 @@
+{
+  "name": "health_dashboard",
+  "version": "1.0.0",
+  "description": "Smart Healthcare Dashboard",
+  "main": "script.js",
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
