@@ -514,4 +514,64 @@ body {
     .chart-container {
         height: 250px;
     }
+    .history-table th, .history-table td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* --- Table Section --- */
+.table-section {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    margin-top: 1.5rem;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.history-table th {
+    background: var(--bg-color);
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.history-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.history-table tbody tr:hover {
+    background: var(--light-blue);
+}
+
+.status-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status-badge.normal {
+    background: var(--success-light);
+    color: var(--success-green);
+}
+
+.status-badge.critical {
+    background: var(--danger-light);
+    color: var(--danger-red);
 }

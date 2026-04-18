@@ -11,8 +11,8 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
             password TEXT
         )`, (err) => {
             if (!err) {
-                // Insert default admin admin123
-                bcrypt.hash('admin123', 10, (err, hash) => {
+                // Insert default admin admin123 -> changed to admin/1234
+                bcrypt.hash('1234', 10, (err, hash) => {
                     if (err) return;
                     db.run('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)', ['admin', hash]);
                 });

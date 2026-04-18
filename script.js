@@ -45,36 +45,50 @@ loginForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({ username: user, password: pass })
         });
         
-        const data = await response.json();
-
         if (response.ok) {
+            const data = await response.json();
             localStorage.setItem('token', data.token);
-            showToast('Success', 'Logged in successfully.', 'success');
-            
-            // Hide login, show dashboard
-            loginView.classList.remove('active-view');
-            loginView.classList.add('hidden-view');
-            
-            setTimeout(() => {
-                loginView.style.display = 'none';
-                dashboardView.style.display = 'flex';
-                
-                // Trigger reflow
-                void dashboardView.offsetWidth;
-                
-                dashboardView.classList.remove('hidden-view');
-                dashboardView.classList.add('active-view');
-                
-                startDashboard();
-            }, 500);
-
+            processLoginSuccess();
+        } else if (response.status === 404) {
+            // Fallback for GitHub Pages!
+            fallbackLogin(user, pass);
         } else {
+            const data = await response.json();
             showToast('Error', data.error || 'Invalid username or password.', 'danger');
         }
     } catch (err) {
-        showToast('Error', 'Could not connect to server.', 'danger');
+        // Fallback for GitHub Pages if server doesn't exist
+        fallbackLogin(user, pass);
     }
 });
+
+function fallbackLogin(user, pass) {
+    if (user === 'admin' && pass === '1234') {
+        localStorage.setItem('token', 'simulated_token_for_github_pages');
+        processLoginSuccess();
+    } else {
+        showToast('Error', 'Invalid username or password (Simulation Mode).', 'danger');
+    }
+}
+
+function processLoginSuccess() {
+    showToast('Success', 'Logged in successfully.', 'success');
+    
+    loginView.classList.remove('active-view');
+    loginView.classList.add('hidden-view');
+    
+    setTimeout(() => {
+        loginView.style.display = 'none';
+        dashboardView.style.display = 'flex';
+        
+        void dashboardView.offsetWidth;
+        
+        dashboardView.classList.remove('hidden-view');
+        dashboardView.classList.add('active-view');
+        
+        startDashboard();
+    }, 500);
+}
 
 logoutBtn.addEventListener('click', () => {
     stopDashboard();
@@ -124,11 +138,22 @@ async function fetchData() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    if (token === 'simulated_token_for_github_pages') {
+        runSimulatedData();
+        return;
+    }
+
     try {
         const response = await fetch('/api/health/data', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
+        if (response.status === 404 || response.status === 405) {
+            // Fallback for GitHub Pages if API doesn't exist
+            runSimulatedData();
+            return;
+        }
+
         if (response.status === 401 || response.status === 403) {
             showToast('Session Expired', 'Please login again.', 'danger');
             logoutBtn.click();
@@ -147,13 +172,69 @@ async function fetchData() {
                 updateUI(latest.spo2, latest.heart_rate);
                 updateChart(latest.spo2, latest.heart_rate, new Date(latest.timestamp));
                 
+                // Populate the table
+                const historyBody = document.getElementById('history-tbody');
+                if (historyBody) {
+                    historyBody.innerHTML = '';
+                    // Data inside array is oldest-to-newest, so reverse to show newest first in table
+                    [...data].reverse().forEach(row => {
+                        const dateObj = new Date(row.timestamp);
+                        const timeString = dateObj.toLocaleTimeString();
+                        const statusClass = row.spo2 < 94 ? 'critical' : 'normal';
+                        const statusText = row.spo2 < 94 ? 'Low Oxygen' : 'Stable';
+                        
+                        historyBody.innerHTML += `
+                            <tr>
+                                <td>${timeString}</td>
+                                <td>${row.spo2}%</td>
+                                <td>${row.heart_rate} bpm</td>
+                                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
+                
                 const now = new Date();
                 timeDisplayEl.textContent = now.toLocaleTimeString();
             }
         }
     } catch (error) {
-        console.error("Error fetching data:", error);
-        showToast('Connection Error', 'Failed to fetch data from Server.', 'danger');
+        // Fallback for GitHub Pages!
+        console.warn("Real backend unreachable, falling back to Simulation Mode.");
+        runSimulatedData();
+    }
+}
+
+function runSimulatedData() {
+    // Generate Random Data
+    const currentSpO2 = generateRandom(90, 100);
+    const currentHR = generateRandom(60, 110);
+    
+    updateUI(currentSpO2, currentHR);
+    updateChart(currentSpO2, currentHR);
+    
+    const now = new Date();
+    timeDisplayEl.textContent = now.toLocaleTimeString();
+    
+    const historyBody = document.getElementById('history-tbody');
+    if (historyBody) {
+        const timeString = now.toLocaleTimeString();
+        const statusClass = currentSpO2 < 94 ? 'critical' : 'normal';
+        const statusText = currentSpO2 < 94 ? 'Low Oxygen' : 'Stable';
+        const newRow = `
+            <tr>
+                <td>${timeString}</td>
+                <td>${currentSpO2}%</td>
+                <td>${currentHR} bpm</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+            </tr>
+        `;
+        // Prepend it 
+        if (historyBody.innerHTML.includes("Waiting for data")) {
+            historyBody.innerHTML = newRow;
+        } else {
+            historyBody.insertAdjacentHTML('afterbegin', newRow);
+        }
     }
 }
 
