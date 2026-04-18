@@ -32,39 +32,53 @@ const spo2Data = [];
 const hrData = [];
 
 // --- Login Logic ---
-loginForm.addEventListener('submit', (e) => {
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const user = usernameInput.value.trim();
     const pass = passwordInput.value.trim();
 
-    if (user === 'admin' && pass === '1234') {
-        showToast('Success', 'Logged in successfully.', 'success');
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
         
-        // Hide login, show dashboard
-        loginView.classList.remove('active-view');
-        loginView.classList.add('hidden-view');
-        
-        setTimeout(() => {
-            loginView.style.display = 'none';
-            dashboardView.style.display = 'flex';
-            
-            // Trigger reflow
-            void dashboardView.offsetWidth;
-            
-            dashboardView.classList.remove('hidden-view');
-            dashboardView.classList.add('active-view');
-            
-            startDashboard();
-        }, 500);
+        const data = await response.json();
 
-    } else {
-        showToast('Error', 'Invalid username or password.', 'danger');
+        if (response.ok) {
+            localStorage.setItem('token', data.token);
+            showToast('Success', 'Logged in successfully.', 'success');
+            
+            // Hide login, show dashboard
+            loginView.classList.remove('active-view');
+            loginView.classList.add('hidden-view');
+            
+            setTimeout(() => {
+                loginView.style.display = 'none';
+                dashboardView.style.display = 'flex';
+                
+                // Trigger reflow
+                void dashboardView.offsetWidth;
+                
+                dashboardView.classList.remove('hidden-view');
+                dashboardView.classList.add('active-view');
+                
+                startDashboard();
+            }, 500);
+
+        } else {
+            showToast('Error', data.error || 'Invalid username or password.', 'danger');
+        }
+    } catch (err) {
+        showToast('Error', 'Could not connect to server.', 'danger');
     }
 });
 
 logoutBtn.addEventListener('click', () => {
     stopDashboard();
+    localStorage.removeItem('token');
     
     dashboardView.classList.remove('active-view');
     dashboardView.classList.add('hidden-view');
@@ -101,30 +115,45 @@ function stopDashboard() {
     labels.length = 0;
     spo2Data.length = 0;
     hrData.length = 0;
+    lastFetchedTimestamp = null;
 }
 
-// Simulated IoT Data fetch since specific ThingSpeak ID wasn't provided 
-// but structure is written to mimic it.
-async function fetchData() {
-    try {
-        // Normally: 
-        // const response = await fetch(API_URL);
-        // const data = await response.json();
-        // const lastEntry = data.feeds[0];
-        
-        // SIMULATION FOR RELIABILITY
-        const currentSpO2 = generateRandom(90, 100);
-        const currentHR = generateRandom(60, 110);
-        
-        updateUI(currentSpO2, currentHR);
-        updateChart(currentSpO2, currentHR);
-        
-        const now = new Date();
-        timeDisplayEl.textContent = now.toLocaleTimeString();
+let lastFetchedTimestamp = null;
 
+async function fetchData() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/health/data', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.status === 401 || response.status === 403) {
+            showToast('Session Expired', 'Please login again.', 'danger');
+            logoutBtn.click();
+            return;
+        }
+
+        const data = await response.json();
+        
+        if (response.ok && data.length > 0) {
+            const latest = data[data.length - 1]; // Because we reverse to chronological
+            
+            // Check if we already plotted this exact timestamp
+            if (lastFetchedTimestamp !== latest.timestamp) {
+                lastFetchedTimestamp = latest.timestamp;
+                
+                updateUI(latest.spo2, latest.heart_rate);
+                updateChart(latest.spo2, latest.heart_rate, new Date(latest.timestamp));
+                
+                const now = new Date();
+                timeDisplayEl.textContent = now.toLocaleTimeString();
+            }
+        }
     } catch (error) {
         console.error("Error fetching data:", error);
-        showToast('Connection Error', 'Failed to fetch data from ThingSpeak.', 'danger');
+        showToast('Connection Error', 'Failed to fetch data from Server.', 'danger');
     }
 }
 
@@ -275,13 +304,12 @@ function initChart() {
     });
 }
 
-function updateChart(spo2, hr) {
+function updateChart(spo2, hr, dateObj = new Date()) {
     if (!healthChart) return;
     
-    const now = new Date();
-    const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
-                       now.getMinutes().toString().padStart(2, '0') + ':' + 
-                       now.getSeconds().toString().padStart(2, '0');
+    const timeString = dateObj.getHours().toString().padStart(2, '0') + ':' + 
+                       dateObj.getMinutes().toString().padStart(2, '0') + ':' + 
+                       dateObj.getSeconds().toString().padStart(2, '0');
     
     // Add new data
     labels.push(timeString);
