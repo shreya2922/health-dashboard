@@ -15,6 +15,12 @@ const statusIconWrapper = document.getElementById('status-icon-wrapper');
 const timeDisplayEl = document.getElementById('time-display');
 const hrIcon = document.querySelector('.fa-heartbeat');
 
+// New Elements
+const viewHistoryBtn = document.getElementById('view-history-btn');
+const backDashboardBtn = document.getElementById('back-dashboard-btn');
+const loginHistoryView = document.getElementById('login-history-view');
+const loginHistoryTbody = document.getElementById('login-history-tbody');
+
 // --- Configuration ---
 // Note: We use an open ThingSpeak channel for demonstration.
 // Format: https://api.thingspeak.com/channels/<CHANNEL_ID>/feeds.json?results=20
@@ -110,6 +116,87 @@ logoutBtn.addEventListener('click', () => {
         passwordInput.value = '';
     }, 500);
 });
+
+// --- Login History Navigation & Logic ---
+if(viewHistoryBtn) {
+    viewHistoryBtn.addEventListener('click', () => {
+        dashboardView.classList.remove('active-view');
+        dashboardView.classList.add('hidden-view');
+        
+        setTimeout(() => {
+            dashboardView.style.display = 'none';
+            loginHistoryView.style.display = 'flex';
+            
+            void loginHistoryView.offsetWidth;
+            
+            loginHistoryView.classList.remove('hidden-view');
+            loginHistoryView.classList.add('active-view');
+            
+            fetchLoginHistory();
+        }, 500);
+    });
+}
+
+if(backDashboardBtn) {
+    backDashboardBtn.addEventListener('click', () => {
+        loginHistoryView.classList.remove('active-view');
+        loginHistoryView.classList.add('hidden-view');
+        
+        setTimeout(() => {
+            loginHistoryView.style.display = 'none';
+            dashboardView.style.display = 'flex';
+            
+            void dashboardView.offsetWidth;
+            
+            dashboardView.classList.remove('hidden-view');
+            dashboardView.classList.add('active-view');
+        }, 500);
+    });
+}
+
+async function fetchLoginHistory() {
+    const token = localStorage.getItem('token');
+    if (!token || token === 'simulated_token_for_github_pages') {
+        loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">Simulated mode. Backend data unavailable.</td></tr>`;
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/history', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            loginHistoryTbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">No history found.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                const dateObj = new Date(row.timestamp);
+                const dateString = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString();
+                
+                let statusClass = 'normal';
+                if (row.status.includes('failed')) statusClass = 'critical';
+
+                loginHistoryTbody.innerHTML += `
+                    <tr>
+                        <td>${dateString}</td>
+                        <td>${row.username || 'unknown'}</td>
+                        <td><span class="status-badge ${statusClass}">${row.status}</span></td>
+                        <td>${row.ip_address || '-'}</td>
+                    </tr>
+                `;
+            });
+        }
+    } catch (err) {
+        console.error(err);
+        loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">Failed to load history.</td></tr>`;
+    }
+}
 
 // --- Dashboard Logic ---
 

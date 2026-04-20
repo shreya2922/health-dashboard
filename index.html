@@ -62,6 +62,10 @@
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     Last Updated: <span id="time-display">Waiting...</span>
                 </div>
+                <button id="view-history-btn" class="btn-secondary">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Login History</span>
+                </button>
                 <button id="logout-btn" class="btn-secondary">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Logout</span>
@@ -150,6 +154,47 @@
                         <tbody id="history-tbody">
                             <tr>
                                 <td colspan="4" style="text-align:center; padding: 2rem;">Waiting for data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Login History View -->
+    <div id="login-history-view" class="view hidden-view">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <h1>System Logs</h1>
+            </div>
+            <div class="nav-actions">
+                <button id="back-dashboard-btn" class="btn-secondary">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Go Back</span>
+                </button>
+            </div>
+        </nav>
+        
+        <main class="dashboard-container">
+            <div class="table-section">
+                <div class="chart-header" style="justify-content: space-between;">
+                    <h3><i class="fa-solid fa-server"></i> Backend Login History</h3>
+                </div>
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date added</th>
+                                <th>Username</th>
+                                <th>Status</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody id="login-history-tbody">
+                            <tr>
+                                <td colspan="4" style="text-align:center; padding: 2rem;">Loading history...</td>
                             </tr>
                         </tbody>
                     </table>
