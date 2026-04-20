@@ -14,15 +14,25 @@ app.use(express.json());
 // Login Endpoint
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
     db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
-        if (err) return res.status(500).json({ error: "Database error" });
-        if (!row) return res.status(401).json({ error: "Invalid username or password" });
+        if (err) {
+            db.run('INSERT INTO login_history (username, status, ip_address) VALUES (?, ?, ?)', [username || 'unknown', 'failed - db error', ipAddress]);
+            return res.status(500).json({ error: "Database error" });
+        }
+        if (!row) {
+            db.run('INSERT INTO login_history (username, status, ip_address) VALUES (?, ?, ?)', [username || 'unknown', 'failed - invalid user', ipAddress]);
+            return res.status(401).json({ error: "Invalid username or password" });
+        }
 
         bcrypt.compare(password, row.password, (err, result) => {
             if (result) {
+                db.run('INSERT INTO login_history (username, status, ip_address) VALUES (?, ?, ?)', [username, 'success', ipAddress]);
                 const token = jwt.sign({ id: row.id, username: row.username }, SECRET_KEY, { expiresIn: '2h' });
                 res.json({ token, message: "Logged in successfully" });
             } else {
+                db.run('INSERT INTO login_history (username, status, ip_address) VALUES (?, ?, ?)', [username, 'failed - invalid password', ipAddress]);
                 res.status(401).json({ error: "Invalid username or password" });
             }
         });
@@ -41,6 +51,14 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// Get Login History Endpoint
+app.get('/api/auth/history', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM login_history ORDER BY timestamp DESC LIMIT 50', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        res.json(rows);
+    });
+});
 
 // Get Dashboard Data Endpoint
 app.get('/api/health/data', authenticateToken, (req, res) => {

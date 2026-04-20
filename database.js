@@ -25,6 +25,14 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
             heart_rate INTEGER,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS login_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            status TEXT,
+            ip_address TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
     }
 });
 
