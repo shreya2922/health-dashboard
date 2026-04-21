@@ -22,11 +22,22 @@ const loginHistoryView = document.getElementById('login-history-view');
 const loginHistoryTbody = document.getElementById('login-history-tbody');
 
 // --- Configuration ---
-// Note: We use an open ThingSpeak channel for demonstration.
-// Format: https://api.thingspeak.com/channels/<CHANNEL_ID>/feeds.json?results=20
-const THINGSPEAK_CHANNEL_ID = '1417'; // Using public channel '1417' as fallback. Wait, let's use a standard or simulated one if it fails.
-// Often real medical demo channels are unreliable, so if fetch fails we will simulate data
-const API_URL = `https://api.thingspeak.com/channels/1417/feeds.json?results=1&api_key=`; // Just a placeholder, we'll actually use Random Simulation so it looks realistic, but we'll try a fetch structure.
+// REPLACE THIS WITH YOUR FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+};
+
+// Initialize Firebase
+if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = typeof firebase !== 'undefined' && firebase.apps.length > 0 ? firebase.database() : null;
 
 let updateInterval = null;
 let healthChart = null;
@@ -44,37 +55,25 @@ loginForm.addEventListener('submit', async (e) => {
     const user = usernameInput.value.trim();
     const pass = passwordInput.value.trim();
 
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: user, password: pass })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            localStorage.setItem('token', data.token);
-            processLoginSuccess();
-        } else if (response.status === 404) {
-            // Fallback for GitHub Pages!
-            fallbackLogin(user, pass);
-        } else {
-            const data = await response.json();
-            showToast('Error', data.error || 'Invalid username or password.', 'danger');
-        }
-    } catch (err) {
-        // Fallback for GitHub Pages if server doesn't exist
-        fallbackLogin(user, pass);
+    if (user === 'admin' && pass === '1234') {
+        localStorage.setItem('token', 'simulated_token_for_github_pages');
+        logToFirebase(user, 'success');
+        processLoginSuccess();
+    } else {
+        logToFirebase(user, 'failed - invalid password');
+        showToast('Error', 'Invalid username or password.', 'danger');
     }
 });
 
-function fallbackLogin(user, pass) {
-    if (user === 'admin' && pass === '1234') {
-        localStorage.setItem('token', 'simulated_token_for_github_pages');
-        processLoginSuccess();
-    } else {
-        showToast('Error', 'Invalid username or password (Simulation Mode).', 'danger');
-    }
+function logToFirebase(username, status) {
+    if (!db) return;
+    const historyRef = db.ref('login_history');
+    historyRef.push({
+        username: username,
+        status: status,
+        ip_address: 'frontend-client',
+        timestamp: Date.now()
+    });
 }
 
 function processLoginSuccess() {
@@ -155,25 +154,25 @@ if(backDashboardBtn) {
 }
 
 async function fetchLoginHistory() {
-    const token = localStorage.getItem('token');
-    if (!token || token === 'simulated_token_for_github_pages') {
-        loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">Simulated mode. Backend data unavailable.</td></tr>`;
+    if (!db) {
+        loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">Firebase not configured. Please add your config in script.js to see live backend data.</td></tr>`;
         return;
     }
 
     try {
-        const response = await fetch('/api/auth/history', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-            const data = await response.json();
+        const historyRef = db.ref('login_history').orderByChild('timestamp').limitToLast(50);
+        historyRef.once('value', (snapshot) => {
             loginHistoryTbody.innerHTML = '';
-            
-            if (data.length === 0) {
+            if (!snapshot.exists()) {
                 loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">No history found.</td></tr>`;
                 return;
             }
+
+            const data = [];
+            snapshot.forEach((childSnapshot) => {
+                data.push(childSnapshot.val());
+            });
+            data.reverse(); // Newest first
 
             data.forEach(row => {
                 const dateObj = new Date(row.timestamp);
@@ -191,7 +190,7 @@ async function fetchLoginHistory() {
                     </tr>
                 `;
             });
-        }
+        });
     } catch (err) {
         console.error(err);
         loginHistoryTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 2rem;">Failed to load history.</td></tr>`;
@@ -202,8 +201,29 @@ async function fetchLoginHistory() {
 
 function startDashboard() {
     initChart();
-    fetchData(); // Initial fetch
-    updateInterval = setInterval(fetchData, 5000); // Update every 5 seconds
+    if (db) {
+        // Listen to live data from Firebase Realtime Database
+        const dataRef = db.ref('health_data').orderByChild('timestamp').limitToLast(1);
+        dataRef.on('child_added', (snapshot) => {
+            const latest = snapshot.val();
+            processNewHealthData(latest);
+        });
+        
+        // Also start a simulator that pushes data to Firebase if we don't have real hardware
+        // Note: In production, your hardware (ESP32/Arduino) will push to Firebase, not this frontend!
+        updateInterval = setInterval(() => {
+            const currentSpO2 = generateRandom(90, 100);
+            const currentHR = generateRandom(60, 110);
+            db.ref('health_data').push({
+                spo2: currentSpO2,
+                heart_rate: currentHR,
+                timestamp: Date.now()
+            });
+        }, 5000);
+    } else {
+        runSimulatedData(); // Initial
+        updateInterval = setInterval(runSimulatedData, 5000); // Update every 5 seconds locally
+    }
 }
 
 function stopDashboard() {
@@ -211,6 +231,9 @@ function stopDashboard() {
     if (healthChart) {
         healthChart.destroy();
         healthChart = null;
+    }
+    if (db) {
+        db.ref('health_data').off();
     }
     // reset data arrays
     labels.length = 0;
@@ -221,108 +244,48 @@ function stopDashboard() {
 
 let lastFetchedTimestamp = null;
 
-async function fetchData() {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    if (token === 'simulated_token_for_github_pages') {
-        runSimulatedData();
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/health/data', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+function processNewHealthData(latest) {
+    if (lastFetchedTimestamp !== latest.timestamp) {
+        lastFetchedTimestamp = latest.timestamp;
         
-        if (response.status === 404 || response.status === 405) {
-            // Fallback for GitHub Pages if API doesn't exist
-            runSimulatedData();
-            return;
-        }
-
-        if (response.status === 401 || response.status === 403) {
-            showToast('Session Expired', 'Please login again.', 'danger');
-            logoutBtn.click();
-            return;
-        }
-
-        const data = await response.json();
+        updateUI(latest.spo2, latest.heart_rate);
+        updateChart(latest.spo2, latest.heart_rate, new Date(latest.timestamp));
         
-        if (response.ok && data.length > 0) {
-            const latest = data[data.length - 1]; // Because we reverse to chronological
-            
-            // Check if we already plotted this exact timestamp
-            if (lastFetchedTimestamp !== latest.timestamp) {
-                lastFetchedTimestamp = latest.timestamp;
-                
-                updateUI(latest.spo2, latest.heart_rate);
-                updateChart(latest.spo2, latest.heart_rate, new Date(latest.timestamp));
-                
-                // Populate the table
-                const historyBody = document.getElementById('history-tbody');
-                if (historyBody) {
-                    historyBody.innerHTML = '';
-                    // Data inside array is oldest-to-newest, so reverse to show newest first in table
-                    [...data].reverse().forEach(row => {
-                        const dateObj = new Date(row.timestamp);
-                        const timeString = dateObj.toLocaleTimeString();
-                        const statusClass = row.spo2 < 94 ? 'critical' : 'normal';
-                        const statusText = row.spo2 < 94 ? 'Low Oxygen' : 'Stable';
-                        
-                        historyBody.innerHTML += `
-                            <tr>
-                                <td>${timeString}</td>
-                                <td>${row.spo2}%</td>
-                                <td>${row.heart_rate} bpm</td>
-                                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                            </tr>
-                        `;
-                    });
-                }
-                
-                const now = new Date();
-                timeDisplayEl.textContent = now.toLocaleTimeString();
+        const now = new Date(latest.timestamp);
+        timeDisplayEl.textContent = now.toLocaleTimeString();
+        
+        const historyBody = document.getElementById('history-tbody');
+        if (historyBody) {
+            const timeString = now.toLocaleTimeString();
+            const statusClass = latest.spo2 < 94 ? 'critical' : 'normal';
+            const statusText = latest.spo2 < 94 ? 'Low Oxygen' : 'Stable';
+            const newRow = `
+                <tr>
+                    <td>${timeString}</td>
+                    <td>${latest.spo2}%</td>
+                    <td>${latest.heart_rate} bpm</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                </tr>
+            `;
+            if (historyBody.innerHTML.includes("Waiting for data")) {
+                historyBody.innerHTML = newRow;
+            } else {
+                historyBody.insertAdjacentHTML('afterbegin', newRow);
             }
         }
-    } catch (error) {
-        // Fallback for GitHub Pages!
-        console.warn("Real backend unreachable, falling back to Simulation Mode.");
-        runSimulatedData();
     }
 }
 
 function runSimulatedData() {
-    // Generate Random Data
+    // Generate Random Data locally
     const currentSpO2 = generateRandom(90, 100);
     const currentHR = generateRandom(60, 110);
     
-    updateUI(currentSpO2, currentHR);
-    updateChart(currentSpO2, currentHR);
-    
-    const now = new Date();
-    timeDisplayEl.textContent = now.toLocaleTimeString();
-    
-    const historyBody = document.getElementById('history-tbody');
-    if (historyBody) {
-        const timeString = now.toLocaleTimeString();
-        const statusClass = currentSpO2 < 94 ? 'critical' : 'normal';
-        const statusText = currentSpO2 < 94 ? 'Low Oxygen' : 'Stable';
-        const newRow = `
-            <tr>
-                <td>${timeString}</td>
-                <td>${currentSpO2}%</td>
-                <td>${currentHR} bpm</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            </tr>
-        `;
-        // Prepend it 
-        if (historyBody.innerHTML.includes("Waiting for data")) {
-            historyBody.innerHTML = newRow;
-        } else {
-            historyBody.insertAdjacentHTML('afterbegin', newRow);
-        }
-    }
+    processNewHealthData({
+        spo2: currentSpO2,
+        heart_rate: currentHR,
+        timestamp: Date.now()
+    });
 }
 
 function updateUI(spo2, hr) {
